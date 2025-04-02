@@ -1,13 +1,15 @@
 
 const gameboard = (function() {
-    let board = [['.', '.', '.'], 
-                 ['.', '.', '.'], 
-                 ['.', '.', '.']];
+    let board = [['', '', ''], 
+                 ['', '', ''], 
+                 ['', '', '']];
     
-    const displayBoard = () => console.log(board);
+    const getBoard = () => {
+        return board;
+    }
     
     const updatePlay = (marker, x, y) => {
-        if (board[x][y] === ".") {
+        if (board[x][y] === "") {
             board[x][y] = marker;
             return true;
         } else {
@@ -21,7 +23,7 @@ const gameboard = (function() {
         for (let i=0; i<3; i++) {
             if (board[i][0] === board[i][1] && 
                 board[i][0] === board[i][2] && 
-                board[i][0] !== ".") {
+                board[i][0] !== "") {
                 return true;
             }
         }
@@ -29,60 +31,184 @@ const gameboard = (function() {
         for (let i=0; i<3; i++) {
             if (board[0][i] === board[1][i] &&
                 board[0][i] === board[2][i] && 
-                board[0][i] !== ".") {
+                board[0][i] !== "") {
                 return true;
             }
         }
         // Diagonal
         if (board[0][0] === board[1][1] &&
             board[0][0] === board[2][2] && 
-            board[0][0] !== ".") {
+            board[0][0] !== "") {
             return true;
         }
         if (board[0][2] === board[1][1] &&
             board[0][2] === board[2][0] && 
-            board[0][2] !== ".") {
+            board[0][2] !== "") {
             return true;
         }
     };
+
+    const checkEnd = () => {
+        for (const i of board) {
+            if (i.includes("")) return false;
+        }
+        return true;
+    }
+
+    const getNewBoard = () => {
+        board = [['', '', ''], 
+                 ['', '', ''], 
+                 ['', '', '']];
+    }
     
-    return {displayBoard, updatePlay, checkWin};
+    return {getBoard, updatePlay, checkWin, checkEnd, getNewBoard};
 })();
 
+
 function createPlayer(marker) {
-    const play = () => {
-        const x = prompt(`Player ${marker}: What x to play?`)
-        const y = prompt(`Player ${marker}: What y to play?`)
+    const play = (x, y) => {
         const validity = gameboard.updatePlay(marker, x, y);
-        if (!validity) play();
+        return validity;
     };
 
     return {play};
 }
 
-const gameFlow = (function() {
-    const playerX = createPlayer('x');
-    const playerO = createPlayer("o");
-    let gameEnd = false;
-    let playerWin;
-    gameboard.displayBoard()
 
-    while(!gameEnd) {
-        playerX.play();
+const gameFlow = (function() {
+    const playerX = createPlayer('X');
+    const playerO = createPlayer("O");
+    let turnX = true;
+    let gameEnd = true;
+    let playerWin;
+    let playerFirst = "Player X";
+    let playerSecond = "Player O";
+
+    const playRound = function(square) {
+        if (gameEnd) {
+            console.log("Game has already ended!")
+            return
+        }
+
+        const [x, y] = square.id.split(" ");
+        if (turnX) {
+            if (playerX.play(x, y)) {
+                turnX = false;
+                return true;
+            }
+        } else {
+            if (playerO.play(x, y)) {
+                turnX = true;
+                return true;
+            }
+        }
+    }
+
+    const checkRound = function() {
         if (gameboard.checkWin()) {
-            playerWin = "X";
             gameEnd = true;
-            break;
-        };
-        gameboard.displayBoard()
-        playerO.play();
-        if (gameboard.checkWin()) {
-            playerWin = "O";
+            if (turnX) {
+                playerWin = playerSecond;
+            } else {
+                playerWin = playerFirst;
+            }
+        }
+
+        else if (gameboard.checkEnd()) {
             gameEnd = true;
-            break;
+            playerWin = "No player";
+        }
+
+        if(gameEnd) {
+            return playerWin;
+        }
+    }
+
+    const getNames = function(firstName, secondName) {
+        [playerFirst, playerSecond] = [firstName, secondName];
+    }
+
+    const getNewGame = () => {
+        gameEnd = false;
+        turnX = true;
+        try {
+            const winDOM = document.querySelector(".win").remove();
+        } catch (error) {
+            console.log(error)
         };
-        gameboard.displayBoard()
+    }
+
+    return {playRound, checkRound, getNames, getNewGame};
+
+})();
+
+
+const display = (function() {
+    const boardDOM = document.querySelector(".board");
+    const squares = document.querySelectorAll(".square");
+
+    boardDOM.addEventListener("click", (e) => {
+        if (gameFlow.playRound(e.target)) {
+            displayBoard();
+            displayWin();
+        };
+    });
+    
+    const displayWin = () => {
+        const playerWin = gameFlow.checkRound();
+        if (gameFlow.checkRound()) {
+            const win = document.createElement("div");
+            win.className = "win";
+            win.textContent = `${playerWin} won!`;
+            const game = document.querySelector(".game");
+            game.insertBefore(win, boardDOM);
+        }
     };
 
-    console.log(`Player ${playerWin} won!!`);
+    const displayBoard = () => {
+        const board = gameboard.getBoard();
+        let iteration = 0;
+        for (let i=0; i<3; i++) {
+            for (let j=0; j<3; j++) {
+                squares[iteration++].textContent = board[i][j];
+            }
+        }
+    };
+
+    return {displayBoard};
+})();
+
+
+const initalizeGame = (function() {
+    // Get names
+    const form = document.querySelector("form");
+    form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        sendNames(form);
+        
+    });
+
+    const sendNames = (form) => {
+        const playerFirst = form.elements.playerX.value;
+        const playerSecond = form.elements.playerO.value;
+        gameFlow.getNames(playerFirst, playerSecond);
+    };
+    
+    // Create new game
+    const initializeBtn = document.createElement("button");
+    initializeBtn.textContent = "New Game";
+
+    const game = document.querySelector(".game");
+    document.body.insertBefore(initializeBtn, game);
+
+    initializeBtn.addEventListener("click", () => newGame());     
+
+    const newGame = () => {
+        gameFlow.getNewGame();
+        gameboard.getNewBoard();
+        display.displayBoard();
+        game.style.display="block";
+        console.log(gameboard.getBoard())
+    }
+
 })();
